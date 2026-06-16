@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-focus-sidebar",
+  "name": "Focus Sidebar",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Directly focus on the left and right sidebars (and restore last active tab/position) using keyboard shortcuts.",
+  "author": "revi1337",
+  "authorUrl": "https://github.com/revi1337",
+  "isDesktopOnly": true
+}

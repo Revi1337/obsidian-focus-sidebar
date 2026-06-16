@@ -1,4 +1,20 @@
-import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { Plugin, WorkspaceLeaf, WorkspaceSplit, WorkspaceItem } from 'obsidian';
+
+// Augment the official Obsidian interfaces to include properties that exist at runtime but aren't in obsidian.d.ts
+declare module 'obsidian' {
+	interface WorkspaceSplit {
+		collapsed: boolean;
+		expand(): void;
+		containerEl: HTMLElement;
+		children: WorkspaceItem[];
+	}
+}
+
+interface WorkspaceTabGroup {
+	type: 'tabs';
+	currentTab: number;
+	children: WorkspaceLeaf[];
+}
 
 export default class FocusSidebarPlugin extends Plugin {
 	// Track the last active leaf in each sidebar
@@ -11,8 +27,8 @@ export default class FocusSidebarPlugin extends Plugin {
 			this.app.workspace.on('active-leaf-change', (leaf) => {
 				if (!leaf || !leaf.view || !leaf.view.containerEl) return;
 
-				const leftSplit = this.app.workspace.leftSplit as any;
-				const rightSplit = this.app.workspace.rightSplit as any;
+				const leftSplit = this.app.workspace.leftSplit as WorkspaceSplit;
+				const rightSplit = this.app.workspace.rightSplit as WorkspaceSplit;
 
 				// In recent Obsidian versions, leaf.getRoot() returns WorkspaceParent
 				const root = typeof leaf.getRoot === 'function' ? leaf.getRoot() : null;
@@ -33,7 +49,7 @@ export default class FocusSidebarPlugin extends Plugin {
 			id: 'focus-left-sidebar',
 			name: 'Focus on left sidebar',
 			callback: () => {
-				this.focusSidebarBasic(this.app.workspace.leftSplit);
+				this.focusSidebarBasic(this.app.workspace.leftSplit as WorkspaceSplit);
 			}
 		});
 
@@ -42,7 +58,7 @@ export default class FocusSidebarPlugin extends Plugin {
 			id: 'focus-right-sidebar',
 			name: 'Focus on right sidebar',
 			callback: () => {
-				this.focusSidebarBasic(this.app.workspace.rightSplit);
+				this.focusSidebarBasic(this.app.workspace.rightSplit as WorkspaceSplit);
 			}
 		});
 
@@ -51,7 +67,7 @@ export default class FocusSidebarPlugin extends Plugin {
 			id: 'focus-left-sidebar-last-pos',
 			name: 'Focus on left sidebar (last position)',
 			callback: () => {
-				this.focusSidebarLastPos(this.app.workspace.leftSplit, 'left');
+				this.focusSidebarLastPos(this.app.workspace.leftSplit as WorkspaceSplit, 'left');
 			}
 		});
 
@@ -60,7 +76,7 @@ export default class FocusSidebarPlugin extends Plugin {
 			id: 'focus-right-sidebar-last-pos',
 			name: 'Focus on right sidebar (last position)',
 			callback: () => {
-				this.focusSidebarLastPos(this.app.workspace.rightSplit, 'right');
+				this.focusSidebarLastPos(this.app.workspace.rightSplit as WorkspaceSplit, 'right');
 			}
 		});
 	}
@@ -68,7 +84,7 @@ export default class FocusSidebarPlugin extends Plugin {
 	onunload() {}
 
 	// Basic focus (activates the currently visible tab and focuses its container)
-	focusSidebarBasic(split: any) {
+	focusSidebarBasic(split: WorkspaceSplit | null) {
 		if (!split) return;
 		if (split.collapsed) {
 			split.expand();
@@ -77,16 +93,16 @@ export default class FocusSidebarPlugin extends Plugin {
 		const leaf = this.getActiveTabOfSplit(split);
 		if (leaf) {
 			this.app.workspace.setActiveLeaf(leaf, { focus: true });
-			setTimeout(() => {
+			window.setTimeout(() => {
 				if (leaf.view && leaf.view.containerEl) {
-					(leaf.view.containerEl as HTMLElement).focus();
+					leaf.view.containerEl.focus();
 				}
 			}, 50);
 		}
 	}
 
 	// Last position focus (restores the last active tab and targets sub-elements)
-	focusSidebarLastPos(split: any, direction: 'left' | 'right') {
+	focusSidebarLastPos(split: WorkspaceSplit | null, direction: 'left' | 'right') {
 		if (!split) return;
 		if (split.collapsed) {
 			split.expand();
@@ -100,21 +116,22 @@ export default class FocusSidebarPlugin extends Plugin {
 
 		if (leaf) {
 			this.app.workspace.setActiveLeaf(leaf, { focus: true });
-			setTimeout(() => {
+			window.setTimeout(() => {
 				this.focusLeafSmart(leaf);
 			}, 50);
 		}
 	}
 
 	// Finds the active (currently visible) tab inside the split
-	getActiveTabOfSplit(split: any): WorkspaceLeaf | null {
+	getActiveTabOfSplit(split: WorkspaceSplit): WorkspaceLeaf | null {
 		if (!split || !split.children) return null;
 
 		for (const child of split.children) {
-			if ((child as any).type === 'tabs') {
-				const currentTabIdx = (child as any).currentTab;
-				if (child.children && child.children[currentTabIdx]) {
-					return child.children[currentTabIdx] as WorkspaceLeaf;
+			const tabGroup = child as unknown as WorkspaceTabGroup;
+			if (tabGroup && tabGroup.type === 'tabs') {
+				const currentTabIdx = tabGroup.currentTab;
+				if (tabGroup.children && tabGroup.children[currentTabIdx]) {
+					return tabGroup.children[currentTabIdx];
 				}
 			}
 		}
@@ -126,7 +143,7 @@ export default class FocusSidebarPlugin extends Plugin {
 				const root = typeof l.getRoot === 'function' ? l.getRoot() : null;
 				const isMine = root === split || (split.containerEl && l.view && l.view.containerEl && split.containerEl.contains(l.view.containerEl));
 				if (isMine) {
-					fallbackLeaf = l as WorkspaceLeaf;
+					fallbackLeaf = l;
 				}
 			}
 		});
@@ -134,9 +151,9 @@ export default class FocusSidebarPlugin extends Plugin {
 	}
 
 	// Validates whether the leaf is still valid and inside the split
-	isLeafValid(leaf: WorkspaceLeaf, split: any): boolean {
+	isLeafValid(leaf: WorkspaceLeaf, split: WorkspaceSplit): boolean {
 		if (!leaf || !leaf.view || !leaf.view.containerEl) return false;
-		if (!document.body.contains(leaf.view.containerEl)) return false;
+		if (!activeDocument.body.contains(leaf.view.containerEl)) return false;
 
 		const root = typeof leaf.getRoot === 'function' ? leaf.getRoot() : null;
 		return root === split || (split.containerEl && split.containerEl.contains(leaf.view.containerEl));
@@ -146,29 +163,30 @@ export default class FocusSidebarPlugin extends Plugin {
 	focusLeafSmart(leaf: WorkspaceLeaf) {
 		if (!leaf || !leaf.view || !leaf.view.containerEl) return;
 
-		const container = leaf.view.containerEl as HTMLElement;
+		const container = leaf.view.containerEl;
 
 		// 1. Focus active tree item (.is-active)
-		const activeTreeItem = container.querySelector('.is-active, .tree-item-self.is-active, .nav-file-title.is-active') as HTMLElement;
-		if (activeTreeItem) {
+		const activeTreeItem = container.querySelector('.is-active, .tree-item-self.is-active, .nav-file-title.is-active');
+		if (activeTreeItem instanceof HTMLElement) {
 			activeTreeItem.focus();
 			return;
 		}
 
 		// 2. Focus input fields (e.g. search box)
-		const inputEl = container.querySelector('input[type="search"], input[type="text"], input, textarea, [contenteditable="true"]') as HTMLInputElement;
-		if (inputEl) {
+		const inputEl = container.querySelector('input[type="search"], input[type="text"], input, textarea, [contenteditable="true"]');
+		if (inputEl instanceof HTMLInputElement || inputEl instanceof HTMLTextAreaElement) {
 			inputEl.focus();
-			if (typeof inputEl.selectionStart === 'number') {
-				inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
-			}
+			inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+			return;
+		} else if (inputEl instanceof HTMLElement && inputEl.isContentEditable) {
+			inputEl.focus();
 			return;
 		}
 
 		// 3. Focus first tree item if nothing else is active
-		const treeItem = container.querySelector('.tree-item-self, .nav-file-title, .nav-folder-title') as HTMLElement;
-		if (treeItem) {
-			(treeItem as HTMLElement).focus();
+		const treeItem = container.querySelector('.tree-item-self, .nav-file-title, .nav-folder-title');
+		if (treeItem instanceof HTMLElement) {
+			treeItem.focus();
 			return;
 		}
 

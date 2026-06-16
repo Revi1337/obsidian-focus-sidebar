@@ -1,7 +1,7 @@
 {
   "id": "focus-sidebar",
   "name": "Focus Sidebar",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.4.0",
   "description": "Directly focus on the left and right sidebars (and restore last active tab/position) using keyboard shortcuts.",
   "author": "revi1337",

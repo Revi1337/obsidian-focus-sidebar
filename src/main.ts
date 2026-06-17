@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, WorkspaceSplit, WorkspaceItem, MarkdownView } from 'obsidian';
+import { Plugin, WorkspaceLeaf, WorkspaceSplit, WorkspaceItem } from 'obsidian';
 
 // Augment the official Obsidian interfaces to include properties that exist at runtime but aren't in obsidian.d.ts
 declare module 'obsidian' {
@@ -148,7 +148,10 @@ export default class FocusSidebarPlugin extends Plugin {
 		if (!split) return;
 
 		const activeEl = activeDocument.activeElement;
-		const isFocusedInSidebar = split.containerEl && split.containerEl.contains(activeEl);
+		// eslint-disable-next-line @typescript-eslint/no-deprecated
+		const activeLeaf = this.app.workspace.activeLeaf;
+		const isFocusedInSidebar = (activeLeaf && this.isLeafValid(activeLeaf, split)) ||
+			(split.containerEl && split.containerEl.contains(activeEl));
 
 		if (isFocusedInSidebar) {
 			this.focusEditor();
@@ -183,10 +186,13 @@ export default class FocusSidebarPlugin extends Plugin {
 			this.app.workspace.setActiveLeaf(leaf, { focus: true });
 			window.setTimeout(() => {
 				if (leaf && leaf.view) {
-					if (leaf.view instanceof MarkdownView) {
-						const mdView = leaf.view as unknown as { editor: { focus: () => void } };
+					const viewType = leaf.view.getViewType();
+					if (viewType === 'markdown') {
+						const mdView = leaf.view as unknown as { editor?: { focus?: () => void } };
 						if (mdView && mdView.editor && typeof mdView.editor.focus === 'function') {
 							mdView.editor.focus();
+						} else {
+							leaf.view.containerEl.focus();
 						}
 					} else {
 						const view = leaf.view as unknown as { focus?: () => void };

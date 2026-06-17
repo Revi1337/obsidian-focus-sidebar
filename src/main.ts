@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf, WorkspaceSplit, WorkspaceItem } from 'obsidian';
+import { Plugin, WorkspaceLeaf, WorkspaceSplit, WorkspaceItem, MarkdownView } from 'obsidian';
 
 // Augment the official Obsidian interfaces to include properties that exist at runtime but aren't in obsidian.d.ts
 declare module 'obsidian' {
@@ -17,12 +17,13 @@ interface WorkspaceTabGroup {
 }
 
 export default class FocusSidebarPlugin extends Plugin {
-	// Track the last active leaf in each sidebar
+	// Track the last active leaf in each sidebar and editor
 	lastLeftActiveLeaf: WorkspaceLeaf | null = null;
 	lastRightActiveLeaf: WorkspaceLeaf | null = null;
+	lastActiveEditorLeaf: WorkspaceLeaf | null = null;
 
 	async onload() {
-		// Track active leaf change to record the last active tab in each sidebar
+		// Track active leaf change to record the last active tab in each sidebar and the center editor
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', (leaf) => {
 				if (!leaf || !leaf.view || !leaf.view.containerEl) return;
@@ -40,6 +41,8 @@ export default class FocusSidebarPlugin extends Plugin {
 					this.lastLeftActiveLeaf = leaf;
 				} else if (isInRight) {
 					this.lastRightActiveLeaf = leaf;
+				} else {
+					this.lastActiveEditorLeaf = leaf;
 				}
 			})
 		);
@@ -77,6 +80,24 @@ export default class FocusSidebarPlugin extends Plugin {
 			name: 'Focus on right sidebar (last position)',
 			callback: () => {
 				this.focusSidebarLastPos(this.app.workspace.rightSplit as WorkspaceSplit, 'right');
+			}
+		});
+
+		// 5. Toggle focus on left sidebar (last position)
+		this.addCommand({
+			id: 'toggle-focus-left-sidebar-last-pos',
+			name: 'Toggle focus on left sidebar (last position)',
+			callback: () => {
+				this.toggleFocusSidebar(this.app.workspace.leftSplit as WorkspaceSplit, 'left');
+			}
+		});
+
+		// 6. Toggle focus on right sidebar (last position)
+		this.addCommand({
+			id: 'toggle-focus-right-sidebar-last-pos',
+			name: 'Toggle focus on right sidebar (last position)',
+			callback: () => {
+				this.toggleFocusSidebar(this.app.workspace.rightSplit as WorkspaceSplit, 'right');
 			}
 		});
 	}
@@ -118,6 +139,64 @@ export default class FocusSidebarPlugin extends Plugin {
 			this.app.workspace.setActiveLeaf(leaf, { focus: true });
 			window.setTimeout(() => {
 				this.focusLeafSmart(leaf);
+			}, 50);
+		}
+	}
+
+	// Toggle focus on sidebar: if already focused, return to editor; else focus sidebar
+	toggleFocusSidebar(split: WorkspaceSplit | null, direction: 'left' | 'right') {
+		if (!split) return;
+
+		const activeEl = activeDocument.activeElement;
+		const isFocusedInSidebar = split.containerEl && split.containerEl.contains(activeEl);
+
+		if (isFocusedInSidebar) {
+			this.focusEditor();
+		} else {
+			this.focusSidebarLastPos(split, direction);
+		}
+	}
+
+	// Focus back on the last active editor leaf (or find first editor tab)
+	focusEditor() {
+		let leaf = this.lastActiveEditorLeaf;
+
+		// Verify the leaf is still valid and connected to the document
+		if (!leaf || !leaf.view || !leaf.view.containerEl || !activeDocument.body.contains(leaf.view.containerEl)) {
+			const leftSplit = this.app.workspace.leftSplit as WorkspaceSplit;
+			const rightSplit = this.app.workspace.rightSplit as WorkspaceSplit;
+			
+			this.app.workspace.iterateAllLeaves((l) => {
+				if (!leaf) {
+					const root = typeof l.getRoot === 'function' ? l.getRoot() : null;
+					const isInLeft = root === leftSplit || (leftSplit && leftSplit.containerEl && leftSplit.containerEl.contains(l.view.containerEl));
+					const isInRight = root === rightSplit || (rightSplit && rightSplit.containerEl && rightSplit.containerEl.contains(l.view.containerEl));
+					
+					if (!isInLeft && !isInRight) {
+						leaf = l;
+					}
+				}
+			});
+		}
+
+		if (leaf) {
+			this.app.workspace.setActiveLeaf(leaf, { focus: true });
+			window.setTimeout(() => {
+				if (leaf && leaf.view) {
+					if (leaf.view instanceof MarkdownView) {
+						const mdView = leaf.view as unknown as { editor: { focus: () => void } };
+						if (mdView && mdView.editor && typeof mdView.editor.focus === 'function') {
+							mdView.editor.focus();
+						}
+					} else {
+						const view = leaf.view as unknown as { focus?: () => void };
+						if (typeof view.focus === 'function') {
+							view.focus();
+						} else if (leaf.view.containerEl) {
+							leaf.view.containerEl.focus();
+						}
+					}
+				}
 			}, 50);
 		}
 	}

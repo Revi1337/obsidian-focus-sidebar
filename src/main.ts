@@ -148,8 +148,7 @@ export default class FocusSidebarPlugin extends Plugin {
 		if (!split) return;
 
 		const activeEl = activeDocument.activeElement;
-		// eslint-disable-next-line @typescript-eslint/no-deprecated
-		const activeLeaf = this.app.workspace.activeLeaf;
+		const activeLeaf = (this.app.workspace as unknown as { activeLeaf: WorkspaceLeaf | null }).activeLeaf;
 		const isFocusedInSidebar = (activeLeaf && this.isLeafValid(activeLeaf, split)) ||
 			(split.containerEl && split.containerEl.contains(activeEl));
 

@@ -83,19 +83,19 @@ export default class FocusSidebarPlugin extends Plugin {
 			}
 		});
 
-		// 5. Toggle focus on left sidebar (last position)
+		// 5. Toggle focus between editor and left sidebar (last position)
 		this.addCommand({
 			id: 'toggle-focus-left-sidebar-last-pos',
-			name: 'Toggle focus on left sidebar (last position)',
+			name: 'Toggle focus between editor and left sidebar (last position)',
 			callback: () => {
 				this.toggleFocusSidebar(this.app.workspace.leftSplit as WorkspaceSplit, 'left');
 			}
 		});
 
-		// 6. Toggle focus on right sidebar (last position)
+		// 6. Toggle focus between editor and right sidebar (last position)
 		this.addCommand({
 			id: 'toggle-focus-right-sidebar-last-pos',
-			name: 'Toggle focus on right sidebar (last position)',
+			name: 'Toggle focus between editor and right sidebar (last position)',
 			callback: () => {
 				this.toggleFocusSidebar(this.app.workspace.rightSplit as WorkspaceSplit, 'right');
 			}
